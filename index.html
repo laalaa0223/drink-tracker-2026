@@ -5,56 +5,30 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>2026 手搖大作戰 ✨</title>
     
-    <!-- 基礎庫 -->
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
     <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
     <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
-    <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-app-compat.js"></script>
-    <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-auth-compat.js"></script>
-    <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore-compat.js"></script>
-    <script src="https://unpkg.com/lucide@latest"></script>
+    
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/11.1.0/firebase-app.js";
+        import { getAuth, onAuthStateChanged, signInAnonymously } from "https://www.gstatic.com/firebasejs/11.1.0/firebase-auth.js";
+        import { getFirestore, doc, onSnapshot, setDoc } from "https://www.gstatic.com/firebasejs/11.1.0/firebase-firestore.js";
+
+        window.FB = { initializeApp, getAuth, onAuthStateChanged, signInAnonymously, getFirestore, doc, onSnapshot, setDoc };
+    </script>
 
     <style>
         @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;700;900&display=swap');
-        
-        body { 
-            font-family: 'Noto Sans TC', sans-serif; 
-            background: linear-gradient(135deg, #FFF5F7 0%, #F0F7FF 100%); 
-            margin: 0; 
-            padding: 0; 
-            min-height: 100vh;
-        }
-
-        .loading-screen { 
-            position: fixed; 
-            inset: 0; 
-            display: flex; 
-            flex-direction: column; 
-            align-items: center; 
-            justify-content: center; 
-            background: linear-gradient(135deg, #FFDEE9 0%, #B5FFFC 100%); 
-            z-index: 9999; 
-        }
-
+        body { font-family: 'Noto Sans TC', sans-serif; background: linear-gradient(135deg, #FFF5F7 0%, #F0F7FF 100%); min-height: 100vh; margin: 0; }
+        .loading-screen { position: fixed; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; background: linear-gradient(135deg, #FFDEE9 0%, #B5FFFC 100%); z-index: 9999; transition: opacity 0.5s ease; }
         .heart-beat { animation: beat 1.5s ease-in-out infinite; }
         @keyframes beat { 0%, 100% { transform: scale(1); } 50% { transform: scale(1.15); } }
-
-        .glass-card {
-            background: rgba(255, 255, 255, 0.75);
-            backdrop-filter: blur(10px);
-            border: 1px solid rgba(255, 255, 255, 0.6);
-        }
-
+        .glass-card { background: rgba(255, 255, 255, 0.75); backdrop-filter: blur(10px); border: 1px solid rgba(255, 255, 255, 0.6); }
         .custom-scroll::-webkit-scrollbar { width: 4px; }
         .custom-scroll::-webkit-scrollbar-thumb { background: #FFD1DC; border-radius: 10px; }
-        
-        input::placeholder { color: #d1d5db; font-weight: 400; }
         input:focus { outline: none; }
-
-        .btn-option {
-            transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
-        }
+        .btn-option { transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1); }
     </style>
 </head>
 <body>
@@ -70,15 +44,6 @@
     <div id="root"></div>
 
     <script type="text/babel">
-        const firebaseConfig = {
-            apiKey: "AIzaSyCJ773ohTtllA3UeUwYqVwv-68Dhu2v0fs",
-            authDomain: "my-drink-tracker.firebaseapp.com",
-            projectId: "my-drink-tracker",
-            storageBucket: "my-drink-tracker.firebasestorage.app",
-            messagingSenderId: "637285768502",
-            appId: "1:637285768502:web:2b192cbc10a046ec47a797"
-        };
-
         const { useState, useEffect, useMemo } = React;
 
         const SUGAR_OPTIONS = ["無法調整", "全糖", "七分", "五分", "三分", "一分", "無糖"];
@@ -96,40 +61,70 @@
             const [isModalOpen, setIsModalOpen] = useState(false);
             const [selectedDate, setSelectedDate] = useState(null);
             const [currentMonth, setCurrentMonth] = useState(new Date(2026, 0, 1));
+            const [isLoading, setIsLoading] = useState(true);
 
+            // 初始化 Firebase
             useEffect(() => {
-                if (!firebase.apps.length) firebase.initializeApp(firebaseConfig);
-                const unsubscribe = firebase.auth().onAuthStateChanged(async (u) => {
-                    if (!u) {
-                        await firebase.auth().signInAnonymously();
-                    } else {
-                        setUser(u);
-                        // 確保載入動畫能多留一下讓使用者看到文字
-                        setTimeout(() => {
-                            document.getElementById('loading-screen').style.opacity = '0';
-                            setTimeout(() => {
-                                document.getElementById('loading-screen').style.display = 'none';
-                            }, 500);
-                        }, 1200);
-                    }
-                });
-                return () => unsubscribe();
+                const initFirebase = async () => {
+                    const config = JSON.parse(window.__firebase_config || '{}');
+                    const app = window.FB.initializeApp(config);
+                    const auth = window.FB.getAuth(app);
+                    
+                    const unsubscribe = window.FB.onAuthStateChanged(auth, (u) => {
+                        if (u) {
+                            setUser(u);
+                        } else {
+                            window.FB.signInAnonymously(auth);
+                        }
+                    });
+                    return unsubscribe;
+                };
+                initFirebase();
             }, []);
 
+            // 監聽數據 (關鍵修復點)
             useEffect(() => {
                 if (!user) return;
-                const db = firebase.firestore();
-                const docRef = db.collection('artifacts').doc('drink-2026').collection('users').doc(user.uid).collection('data').doc('main');
-                return docRef.onSnapshot(doc => {
-                    if (doc.exists) setRecords(doc.data().records || {});
+                
+                const db = window.FB.getFirestore();
+                const appId = window.__app_id || 'drink-tracker-2026';
+                // 嚴格遵守路徑規範
+                const docRef = window.FB.doc(db, 'artifacts', appId, 'users', user.uid, 'data', 'main');
+                
+                const unsubscribe = window.FB.onSnapshot(docRef, (docSnap) => {
+                    if (docSnap.exists()) {
+                        setRecords(docSnap.data().records || {});
+                    }
+                    setIsLoading(false);
+                    // 隱藏載入畫面
+                    setTimeout(() => {
+                        const loader = document.getElementById('loading-screen');
+                        if (loader) {
+                            loader.style.opacity = '0';
+                            setTimeout(() => loader.style.display = 'none', 500);
+                        }
+                    }, 800);
+                }, (err) => {
+                    console.error("Firestore Error:", err);
+                    setIsLoading(false);
                 });
+
+                return () => unsubscribe();
             }, [user]);
 
             const syncData = async (newRecords) => {
-                setRecords(newRecords);
                 if (!user) return;
-                const docRef = firebase.firestore().collection('artifacts').doc('drink-2026').collection('users').doc(user.uid).collection('data').doc('main');
-                await docRef.set({ records: newRecords }, { merge: true });
+                setRecords(newRecords); // 樂觀更新 UI
+                
+                const db = window.FB.getFirestore();
+                const appId = window.__app_id || 'drink-tracker-2026';
+                const docRef = window.FB.doc(db, 'artifacts', appId, 'users', user.uid, 'data', 'main');
+                
+                try {
+                    await window.FB.setDoc(docRef, { records: newRecords }, { merge: true });
+                } catch (e) {
+                    console.error("Save Error:", e);
+                }
             };
 
             const analytics = useMemo(() => {
@@ -142,22 +137,21 @@
                     if (y === 2026) {
                         yC += list.length;
                         if (m === targetM) mC += list.length;
-
                         list.forEach(drink => {
-                            const price = parseInt(drink.price || 0);
-                            yPrice += price;
-                            if (m === targetM) mPrice += price;
-                            
+                            const p = parseInt(drink.price || 0);
+                            yPrice += p;
+                            if (m === targetM) mPrice += p;
                             if (drink.shop) shops[drink.shop] = (shops[drink.shop] || 0) + 1;
                             if (drink.item) items[drink.item] = (items[drink.item] || 0) + 1;
                         });
                     }
                 });
 
-                const favoriteShop = Object.entries(shops).sort((a,b) => b[1]-a[1])[0]?.[0] || "尚未紀錄";
-                const favoriteItem = Object.entries(items).sort((a,b) => b[1]-a[1])[0]?.[0] || "尚未紀錄";
-
-                return { mC, yC, mPrice, yPrice, favoriteShop, favoriteItem };
+                return { 
+                    mC, yC, mPrice, yPrice, 
+                    favoriteShop: Object.entries(shops).sort((a,b) => b[1]-a[1])[0]?.[0] || "尚未紀錄",
+                    favoriteItem: Object.entries(items).sort((a,b) => b[1]-a[1])[0]?.[0] || "尚未紀錄"
+                };
             }, [records, currentMonth]);
 
             const days = useMemo(() => ({
@@ -166,7 +160,7 @@
             }), [currentMonth]);
 
             const updateDrink = (date, drinkId, updates) => {
-                const newList = records[date].map(i => i.id === drinkId ? {...i, ...updates} : i);
+                const newList = (records[date] || []).map(i => i.id === drinkId ? {...i, ...updates} : i);
                 syncData({...records, [date]: newList});
             };
 
@@ -175,7 +169,7 @@
                     <header className="bg-gradient-to-r from-[#FFD1DC] to-[#B5FFFC] rounded-[2.5rem] p-8 mb-6 text-white text-center shadow-lg relative overflow-hidden">
                         <div className="absolute top-[-10px] left-[-10px] opacity-20"><HeartIcon className="w-20 h-20" fill="white"/></div>
                         <h1 className="text-3xl font-black tracking-wider drop-shadow-md">2026 手搖大作戰</h1>
-                        <p className="text-[10px] font-bold uppercase mt-2 tracking-[0.2em] opacity-90 italic">Sweetness Tracking System</p>
+                        <p className="text-[10px] font-bold uppercase mt-2 tracking-[0.2em] opacity-90 italic">Cloud Sync Enabled</p>
                     </header>
 
                     <div className="grid grid-cols-2 gap-4 mb-4">
@@ -194,17 +188,6 @@
                             </div>
                             <div className="text-2xl font-black text-blue-400 leading-tight">{analytics.yC} <span className="text-[10px]">杯</span></div>
                             <div className="text-sm font-bold text-gray-400 mt-1">$ {analytics.yPrice}</div>
-                        </div>
-                    </div>
-
-                    <div className="glass-card p-5 rounded-[2.2rem] shadow-sm mb-6 flex justify-between items-center border-white/50">
-                        <div className="flex-1 text-center border-r border-gray-100">
-                            <div className="text-[10px] font-bold text-gray-400 mb-1">最常去店家</div>
-                            <div className="text-sm font-black text-gray-600 truncate px-2">{analytics.favoriteShop}</div>
-                        </div>
-                        <div className="flex-1 text-center">
-                            <div className="text-[10px] font-bold text-gray-400 mb-1">最愛喝品項</div>
-                            <div className="text-sm font-black text-gray-600 truncate px-2">{analytics.favoriteItem}</div>
                         </div>
                     </div>
 
@@ -241,7 +224,7 @@
                                         <h2 className="text-2xl font-black text-gray-700">{selectedDate}</h2>
                                         <div className="text-[10px] text-pink-300 font-bold flex items-center gap-1 uppercase tracking-widest"><HeartIcon className="w-3 h-3" fill="currentColor"/> Daily sweetness memo</div>
                                     </div>
-                                    <button onClick={() => setIsModalOpen(false)} className="bg-gray-50 p-2 rounded-full text-gray-300 hover:text-pink-400 transition-colors"><i data-lucide="x" className="w-6 h-6"></i></button>
+                                    <button onClick={() => setIsModalOpen(false)} className="bg-gray-50 p-2 rounded-full text-gray-300 hover:text-pink-400"><svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12"></path></svg></button>
                                 </div>
                                 
                                 <div className="space-y-6 overflow-y-auto pr-2 custom-scroll flex-1 pb-6">
@@ -251,7 +234,7 @@
                                                 const newList = records[selectedDate].filter(i => i.id !== drink.id);
                                                 syncData({...records, [selectedDate]: newList});
                                             }} className="absolute -top-1 -right-1 bg-white shadow-md p-1.5 rounded-full text-rose-200 hover:text-rose-400 border border-pink-50 z-10">
-                                                <i data-lucide="minus" className="w-3 h-3"></i>
+                                                <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M20 12H4"></path></svg>
                                             </button>
                                             
                                             <div className="grid grid-cols-2 gap-3">
@@ -265,12 +248,8 @@
                                                 </div>
                                             </div>
 
-                                            {/* 甜度選擇 */}
                                             <div className="space-y-2">
-                                                <div className="flex justify-between items-center ml-2">
-                                                    <label className="text-[10px] font-black text-gray-400 uppercase tracking-tighter">Sugar Level</label>
-                                                    <span className="text-[10px] font-bold text-pink-400">{drink.sugar || "未選擇"}</span>
-                                                </div>
+                                                <label className="text-[10px] font-black text-gray-400 uppercase tracking-tighter block ml-2">Sugar Level: <span className="text-pink-400">{drink.sugar}</span></label>
                                                 <div className="flex flex-wrap gap-2">
                                                     {SUGAR_OPTIONS.map(opt => (
                                                         <button key={opt} onClick={() => updateDrink(selectedDate, drink.id, {sugar: opt})} 
@@ -281,12 +260,8 @@
                                                 </div>
                                             </div>
 
-                                            {/* 冰塊選擇 */}
                                             <div className="space-y-2">
-                                                <div className="flex justify-between items-center ml-2">
-                                                    <label className="text-[10px] font-black text-gray-400 uppercase tracking-tighter">Ice Level</label>
-                                                    <span className="text-[10px] font-bold text-blue-400">{drink.ice || "未選擇"}</span>
-                                                </div>
+                                                <label className="text-[10px] font-black text-gray-400 uppercase tracking-tighter block ml-2">Ice Level: <span className="text-blue-400">{drink.ice}</span></label>
                                                 <div className="flex flex-wrap gap-2">
                                                     {ICE_OPTIONS.map(opt => (
                                                         <button key={opt} onClick={() => updateDrink(selectedDate, drink.id, {ice: opt})} 
