@@ -1,410 +1,243 @@
 <!DOCTYPE html>
-
 <html lang="zh-Hant">
-
 <head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>2026 手搖大作戰 ✨</title>
+    
+    <!-- 預先載入 Tailwind -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;700;900&display=swap');
+        
+        body { 
+            font-family: 'Noto Sans TC', sans-serif; 
+            background: linear-gradient(135deg, #FFF5F7 0%, #F0F7FF 100%); 
+            margin: 0; 
+            padding: 0; 
+            min-height: 100vh;
+        }
 
-<meta charset="UTF-8">
+        .loading-screen { 
+            position: fixed; 
+            inset: 0; 
+            display: flex; 
+            flex-direction: column; 
+            align-items: center; 
+            justify-content: center; 
+            background: linear-gradient(135deg, #FFDEE9 0%, #B5FFFC 100%); 
+            z-index: 9999; 
+        }
 
-<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+        .heart-beat { animation: beat 1.5s ease-in-out infinite; }
+        @keyframes beat { 0%, 100% { transform: scale(1); } 50% { transform: scale(1.15); } }
 
-<title>2026 手搖大作戰 ✨</title>
+        .glass-card {
+            background: rgba(255, 255, 255, 0.7);
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(255, 255, 255, 0.5);
+        }
 
-<!-- 1. 基礎庫載入 -->
-
-<script src="https://cdn.tailwindcss.com"></script>
-
-<script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
-
-<script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
-
-<script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
-
-
-<!-- 2. Firebase 庫 -->
-
-<script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-app-compat.js"></script>
-
-<script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-auth-compat.js"></script>
-
-<script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore-compat.js"></script>
-
-
-
-<!-- 3. 圖標庫 (修正版) -->
-
-<script src="https://unpkg.com/lucide@latest"></script>
-
-
-
-<style>
-
-@import url('https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;700;900&display=swap');
-
-body { font-family: 'Noto Sans TC', sans-serif; background-color: #FFF9FB; margin: 0; padding: 0; }
-
-.heart-beat { animation: beat 1.5s ease-in-out infinite; }
-
-@keyframes beat { 0%, 100% { transform: scale(1); } 50% { transform: scale(1.1); } }
-
-/* 避免白屏闪烁 */
-
-#root:empty { display: none; }
-
-</style>
-
+        .custom-scroll::-webkit-scrollbar { width: 4px; }
+        .custom-scroll::-webkit-scrollbar-thumb { background: #FFD1DC; border-radius: 10px; }
+    </style>
 </head>
-
 <body>
-
-<div id="root"></div>
-
-
-
-<script type="text/babel">
-
-// 🔴 請確保這裡填入的是你自己的 Firebase 金鑰 🔴
-
-const firebaseConfig = {
-
-const firebaseConfig = {
-  apiKey: "AIzaSyCJ773ohTtllA3UeUwYqVwv-68Dhu2v0fs",
-  authDomain: "my-drink-tracker.firebaseapp.com",
-  projectId: "my-drink-tracker",
-  storageBucket: "my-drink-tracker.firebasestorage.app",
-  messagingSenderId: "637285768502",
-  appId: "1:637285768502:web:2b192cbc10a046ec47a797",
-  measurementId: "G-21055EVPQL"
-};
-
-
-
-const { useState, useEffect, useMemo } = React;
-
-
-
-// 自定義圖標組件，確保 lucide 存在
-
-const Icon = ({ name, size = 24, className = "" }) => {
-
-useEffect(() => {
-
-if (window.lucide) {
-
-window.lucide.createIcons();
-
-}
-
-}, [name]);
-
-return <i data-lucide={name} style={{ width: size, height: size }} className={className}></i>;
-
-};
-
-
-
-const App = () => {
-
-const [user, setUser] = useState(null);
-
-const [records, setRecords] = useState({});
-
-const [isModalOpen, setIsModalOpen] = useState(false);
-
-const [selectedDate, setSelectedDate] = useState(null);
-
-const [currentMonth, setCurrentMonth] = useState(new Date(2026, 0, 1));
-
-const [loading, setLoading] = useState(true);
-
-
-
-useEffect(() => {
-
-try {
-
-if (!firebase.apps.length) firebase.initializeApp(firebaseConfig);
-
-const auth = firebase.auth();
-
-auth.signInAnonymously().catch(console.error);
-
-const unsubscribe = auth.onAuthStateChanged(u => {
-
-setUser(u);
-
-setLoading(false);
-
-if (window.lucide) window.lucide.createIcons();
-
-});
-
-return () => unsubscribe();
-
-} catch (err) {
-
-console.error(err);
-
-}
-
-}, []);
-
-
-
-useEffect(() => {
-
-if (!user) return;
-
-const db = firebase.firestore();
-
-const docRef = db.collection('drink-app').doc(user.uid);
-
-const unsubscribe = docRef.onSnapshot(doc => {
-
-if (doc.exists) setRecords(doc.data().records || {});
-
-});
-
-return () => unsubscribe();
-
-}, [user]);
-
-
-
-const syncData = async (newRecords) => {
-
-setRecords(newRecords);
-
-if (!user) return;
-
-await firebase.firestore().collection('drink-app').doc(user.uid).set({ records: newRecords });
-
-};
-
-
-
-const analytics = useMemo(() => {
-
-const shopMap = {}; let mC = 0; let yC = 0;
-
-const targetM = currentMonth.getMonth() + 1;
-
-Object.entries(records).forEach(([date, list]) => {
-
-const [y, m] = date.split('-').map(Number);
-
-if (y === 2026) {
-
-yC += list.length;
-
-if (m === targetM) mC += list.length;
-
-list.forEach(i => { if(i.shop) shopMap[i.shop] = (shopMap[i.shop]||0)+1; });
-
-}
-
-});
-
-const topShop = Object.entries(shopMap).sort((a,b)=>b[1]-a[1])[0]?.[0] || "無";
-
-return { mC, yC, topShop };
-
-}, [records, currentMonth]);
-
-
-
-const days = useMemo(() => {
-
-const start = new Date(currentMonth.getFullYear(), currentMonth.getMonth(), 1).getDay();
-
-const total = new Date(currentMonth.getFullYear(), currentMonth.getMonth() + 1, 0).getDate();
-
-return { start, total };
-
-}, [currentMonth]);
-
-
-
-if (loading) return <div className="h-screen flex items-center justify-center text-pink-400 font-bold text-xl">✨ 載入中...</div>;
-
-
-
-return (
-
-<div className="max-w-md mx-auto p-4 min-h-screen">
-
-<header className="bg-gradient-to-r from-pink-300 to-rose-300 rounded-3xl p-6 mb-6 text-white text-center shadow-lg">
-
-<h1 className="text-2xl font-black tracking-tighter">2026 手搖大作戰</h1>
-
-<p className="text-xs opacity-80 font-bold uppercase mt-1">Daily Beverage Tracker</p>
-
-</header>
-
-
-
-<div className="grid grid-cols-2 gap-4 mb-6">
-
-<div className="bg-white p-4 rounded-3xl shadow-sm border-b-4 border-pink-100">
-
-<div className="flex items-center gap-2 mb-1">
-
-<Icon name="cup-soda" size={16} className="text-pink-400" />
-
-<span className="text-xs font-bold text-gray-400">本月杯數</span>
-
-</div>
-
-<div className="text-2xl font-black text-gray-700">{analytics.mC} <span className="text-sm font-normal text-gray-400">杯</span></div>
-
-</div>
-
-<div className="bg-white p-4 rounded-3xl shadow-sm border-b-4 border-rose-100">
-
-<div className="flex items-center gap-2 mb-1">
-
-<Icon name="crown" size={16} className="text-rose-400" />
-
-<span className="text-xs font-bold text-gray-400">年度總計</span>
-
-</div>
-
-<div className="text-2xl font-black text-gray-700">{analytics.yC} <span className="text-sm font-normal text-gray-400">杯</span></div>
-
-</div>
-
-</div>
-
-
-
-<div className="flex justify-between items-center mb-4 px-2">
-
-<button onClick={() => setCurrentMonth(new Date(currentMonth.getFullYear(), currentMonth.getMonth()-1))} className="p-2 bg-white rounded-full shadow-sm"><Icon name="chevron-left" size={20}/></button>
-
-<span className="font-black text-gray-600 text-lg">{currentMonth.getFullYear()} / {currentMonth.getMonth()+1}</span>
-
-<button onClick={() => setCurrentMonth(new Date(currentMonth.getFullYear(), currentMonth.getMonth()+1))} className="p-2 bg-white rounded-full shadow-sm"><Icon name="chevron-right" size={20}/></button>
-
-</div>
-
-
-
-<div className="bg-white rounded-[2.5rem] p-6 shadow-xl border border-pink-50 grid grid-cols-7 gap-2">
-
-{['日','一','二','三','四','五','六'].map(d => <div key={d} className="text-center text-xs font-bold text-gray-300 mb-2">{d}</div>)}
-
-{Array.from({ length: days.start }).map((_, i) => <div key={`empty-${i}`} />)}
-
-{Array.from({ length: days.total }).map((_, i) => {
-
-const d = i + 1;
-
-const key = `2026-${currentMonth.getMonth()+1}-${d}`;
-
-const count = (records[key] || []).length;
-
-return (
-
-<div key={d} onClick={() => { setSelectedDate(key); setIsModalOpen(true); }} className={`h-12 rounded-2xl flex flex-col items-center justify-center cursor-pointer transition-all ${count > 0 ? 'bg-pink-50 border-2 border-pink-100 scale-105' : 'hover:bg-gray-50'}`}>
-
-<span className={`text-xs font-bold ${count > 0 ? 'text-pink-500' : 'text-gray-400'}`}>{d}</span>
-
-{count > 0 && <Icon name="heart" size={8} className="text-pink-400 fill-pink-400 heart-beat mt-1" />}
-
-</div>
-
-);
-
-})}
-
-</div>
-
-
-
-{isModalOpen && (
-
-<div className="fixed inset-0 z-50 bg-black/40 backdrop-blur-md flex items-end sm:items-center justify-center p-4">
-
-<div className="bg-white w-full max-w-md rounded-[3rem] p-8 shadow-2xl animate-in slide-in-from-bottom duration-300">
-
-<div className="flex justify-between items-center mb-6">
-
-<h2 className="text-xl font-black text-gray-700">{selectedDate} 飲酒錄</h2>
-
-<button onClick={() => setIsModalOpen(false)} className="bg-gray-100 p-2 rounded-full text-gray-400"><Icon name="x" size={20}/></button>
-
-</div>
-
-<div className="space-y-4 mb-6">
-
-{(records[selectedDate] || []).map(drink => (
-
-<div key={drink.id} className="p-4 bg-pink-50/50 rounded-3xl border border-pink-100 relative group">
-
-<button onClick={() => {
-
-const newList = records[selectedDate].filter(i => i.id !== drink.id);
-
-syncData({...records, [selectedDate]: newList});
-
-}} className="absolute -top-2 -right-2 bg-white shadow-md p-1.5 rounded-full text-gray-300 hover:text-red-400"><Icon name="trash-2" size={14}/></button>
-
-<div className="flex gap-2">
-
-<input placeholder="店家" value={drink.shop} onChange={e => {
-
-const newList = records[selectedDate].map(i => i.id === drink.id ? {...i, shop: e.target.value} : i);
-
-syncData({...records, [selectedDate]: newList});
-
-}} className="w-1/2 p-3 rounded-2xl text-sm font-bold bg-white focus:ring-2 ring-pink-200 outline-none" />
-
-<input placeholder="品項" value={drink.item} onChange={e => {
-
-const newList = records[selectedDate].map(i => i.id === drink.id ? {...i, item: e.target.value} : i);
-
-syncData({...records, [selectedDate]: newList});
-
-}} className="w-1/2 p-3 rounded-2xl text-sm font-bold bg-white focus:ring-2 ring-pink-200 outline-none" />
-
-</div>
-
-</div>
-
-))}
-
-<button onClick={() => {
-
-const newList = [...(records[selectedDate] || []), { id: Date.now(), shop:'', item:'' }];
-
-syncData({...records, [selectedDate]: newList});
-
-}} className="w-full py-4 border-2 border-dashed border-pink-200 rounded-3xl text-pink-300 font-bold hover:bg-pink-50 transition-colors">+ 新增這杯飲料</button>
-
-</div>
-
-<button onClick={() => setIsModalOpen(false)} className="w-full bg-gradient-to-r from-pink-400 to-rose-400 text-white font-black py-4 rounded-[2rem] shadow-lg shadow-pink-200 transform active:scale-95 transition-transform">儲存我的紀錄</button>
-
-</div>
-
-</div>
-
-)}
-
-</div>
-
-);
-
-};
-
-
-
-const root = ReactDOM.createRoot(document.getElementById('root'));
-
-root.render(<App />);
-
-</script>
-
+    <!-- 初始載入畫面 -->
+    <div id="loading-screen" class="loading-screen">
+        <div class="text-white text-5xl mb-4 heart-beat">❤️</div>
+        <div class="text-white font-bold tracking-widest animate-pulse">正在開啟夢幻紀錄本...</div>
+        <div id="error-display" class="mt-4 p-4 text-xs text-rose-500 hidden max-w-xs break-all bg-white/80 rounded-lg"></div>
+    </div>
+
+    <div id="root"></div>
+
+    <!-- 庫資源載入 -->
+    <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+    <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-auth-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore-compat.js"></script>
+    <script src="https://unpkg.com/lucide@latest"></script>
+
+    <script type="text/babel">
+        // 錯誤攔截顯示
+        window.onerror = function(msg, url, line) {
+            const errDiv = document.getElementById('error-display');
+            if (errDiv) {
+                errDiv.classList.remove('hidden');
+                errDiv.innerHTML = `Ops! 出錯了: ${msg} <br> 行號: ${line}`;
+            }
+            return false;
+        };
+
+        const firebaseConfig = {
+            apiKey: "AIzaSyCJ773ohTtllA3UeUwYqVwv-68Dhu2v0fs",
+            authDomain: "my-drink-tracker.firebaseapp.com",
+            projectId: "my-drink-tracker",
+            storageBucket: "my-drink-tracker.firebasestorage.app",
+            messagingSenderId: "637285768502",
+            appId: "1:637285768502:web:2b192cbc10a046ec47a797"
+        };
+
+        const { useState, useEffect, useMemo } = React;
+
+        const Icon = ({ name, size = 24, className = "" }) => {
+            useEffect(() => { if (window.lucide) window.lucide.createIcons(); }, [name]);
+            return <i data-lucide={name} style={{ width: size, height: size }} className={className}></i>;
+        };
+
+        const App = () => {
+            const [user, setUser] = useState(null);
+            const [records, setRecords] = useState({});
+            const [isModalOpen, setIsModalOpen] = useState(false);
+            const [selectedDate, setSelectedDate] = useState(null);
+            const [currentMonth, setCurrentMonth] = useState(new Date(2026, 0, 1));
+
+            useEffect(() => {
+                if (!firebase.apps.length) firebase.initializeApp(firebaseConfig);
+                const unsubscribe = firebase.auth().onAuthStateChanged(async (u) => {
+                    if (!u) {
+                        await firebase.auth().signInAnonymously();
+                    } else {
+                        setUser(u);
+                        const ls = document.getElementById('loading-screen');
+                        if (ls) ls.style.display = 'none';
+                    }
+                });
+                return () => unsubscribe();
+            }, []);
+
+            useEffect(() => {
+                if (!user) return;
+                const db = firebase.firestore();
+                const docRef = db.collection('artifacts').doc('drink-2026').collection('users').doc(user.uid).collection('data').doc('main');
+                
+                return docRef.onSnapshot(doc => {
+                    if (doc.exists) setRecords(doc.data().records || {});
+                });
+            }, [user]);
+
+            const syncData = async (newRecords) => {
+                setRecords(newRecords);
+                if (!user) return;
+                const docRef = firebase.firestore().collection('artifacts').doc('drink-2026').collection('users').doc(user.uid).collection('data').doc('main');
+                await docRef.set({ records: newRecords }, { merge: true });
+            };
+
+            const analytics = useMemo(() => {
+                let mC = 0; let yC = 0;
+                const targetM = currentMonth.getMonth() + 1;
+                Object.entries(records).forEach(([date, list]) => {
+                    const [y, m] = date.split('-').map(Number);
+                    if (y === 2026) {
+                        yC += list.length;
+                        if (m === targetM) mC += list.length;
+                    }
+                });
+                return { mC, yC };
+            }, [records, currentMonth]);
+
+            const days = useMemo(() => ({
+                start: new Date(currentMonth.getFullYear(), currentMonth.getMonth(), 1).getDay(),
+                total: new Date(currentMonth.getFullYear(), currentMonth.getMonth() + 1, 0).getDate()
+            }), [currentMonth]);
+
+            return (
+                <div className="max-w-md mx-auto p-4 min-h-screen pb-10">
+                    {/* Header: 粉藍漸變 */}
+                    <header className="bg-gradient-to-r from-[#FFD1DC] to-[#B5FFFC] rounded-[2.5rem] p-8 mb-6 text-white text-center shadow-lg relative overflow-hidden">
+                        <div className="absolute top-[-10px] left-[-10px] opacity-20"><Icon name="heart" size={60} className="fill-white"/></div>
+                        <h1 className="text-3xl font-black tracking-wider drop-shadow-md">2026 手搖大作戰</h1>
+                        <p className="text-[10px] font-bold uppercase mt-2 tracking-[0.2em] opacity-90">Sweet Drink Diary</p>
+                    </header>
+
+                    {/* Stats */}
+                    <div className="grid grid-cols-2 gap-4 mb-8">
+                        <div className="glass-card p-5 rounded-[2.2rem] shadow-sm flex flex-col items-center border-pink-100">
+                            <Icon name="sparkles" size={16} className="text-pink-300 mb-1"/>
+                            <span className="text-[10px] font-bold text-gray-400 uppercase">This Month</span>
+                            <div className="text-3xl font-black text-pink-500">{analytics.mC}</div>
+                        </div>
+                        <div className="glass-card p-5 rounded-[2.2rem] shadow-sm flex flex-col items-center border-blue-100">
+                            <Icon name="trophy" size={16} className="text-blue-300 mb-1"/>
+                            <span className="text-[10px] font-bold text-gray-400 uppercase">Yearly Total</span>
+                            <div className="text-3xl font-black text-blue-400">{analytics.yC}</div>
+                        </div>
+                    </div>
+
+                    {/* Calendar Area */}
+                    <div className="glass-card rounded-[3rem] p-8 shadow-sm">
+                        <div className="flex justify-between items-center mb-8 px-2 font-black text-gray-600">
+                            <button onClick={() => setCurrentMonth(new Date(currentMonth.getFullYear(), currentMonth.getMonth()-1))} className="text-pink-200 hover:text-pink-400 transition-colors"><Icon name="heart" size={24} className="fill-current"/></button>
+                            <span className="text-xl tracking-tight">{currentMonth.getFullYear()} / {currentMonth.getMonth()+1}</span>
+                            <button onClick={() => setCurrentMonth(new Date(currentMonth.getFullYear(), currentMonth.getMonth()+1))} className="text-blue-200 hover:text-blue-400 transition-colors"><Icon name="star" size={24} className="fill-current"/></button>
+                        </div>
+
+                        <div className="grid grid-cols-7 gap-3">
+                            {['日','一','二','三','四','五','六'].map(d => <div key={d} className="text-center text-[10px] font-bold text-gray-300">{d}</div>)}
+                            {Array.from({ length: days.start }).map((_, i) => <div key={`e-${i}`} />)}
+                            {Array.from({ length: days.total }).map((_, i) => {
+                                const d = i + 1;
+                                const key = `2026-${currentMonth.getMonth()+1}-${d}`;
+                                const count = (records[key] || []).length;
+                                return (
+                                    <div key={d} onClick={() => { setSelectedDate(key); setIsModalOpen(true); }} 
+                                         className={`h-11 rounded-2xl flex flex-col items-center justify-center cursor-pointer transition-all active:scale-90 ${count > 0 ? 'bg-gradient-to-br from-pink-200 to-blue-200 text-white shadow-sm' : 'text-gray-400 hover:bg-white'}`}>
+                                        <span className="text-xs font-black">{d}</span>
+                                        {count > 0 && <Icon name="heart" size={8} className="fill-white text-white mt-0.5 heart-beat" />}
+                                    </div>
+                                );
+                            })}
+                        </div>
+                    </div>
+
+                    {/* Modal: 下方滑出 */}
+                    {isModalOpen && (
+                        <div className="fixed inset-0 z-50 bg-blue-900/10 backdrop-blur-md flex items-end justify-center">
+                            <div className="bg-white w-full max-w-md rounded-t-[3.5rem] p-10 shadow-2xl animate-in slide-in-from-bottom duration-500 border-t-4 border-pink-100">
+                                <div className="flex justify-between items-center mb-8">
+                                    <div>
+                                        <h2 className="text-2xl font-black text-gray-700">{selectedDate}</h2>
+                                        <p className="text-[10px] text-pink-300 font-bold uppercase tracking-widest">記錄每一口甜味</p>
+                                    </div>
+                                    <button onClick={() => setIsModalOpen(false)} className="bg-gray-50 p-3 rounded-full text-gray-300 hover:text-pink-400"><Icon name="x" size={24}/></button>
+                                </div>
+                                
+                                <div className="space-y-4 mb-10 max-h-[45vh] overflow-y-auto pr-2 custom-scroll">
+                                    {(records[selectedDate] || []).map(drink => (
+                                        <div key={drink.id} className="p-6 bg-gradient-to-r from-pink-50/50 to-blue-50/50 rounded-[2rem] relative border border-white flex gap-3 shadow-sm">
+                                            <button onClick={() => {
+                                                const newList = records[selectedDate].filter(i => i.id !== drink.id);
+                                                syncData({...records, [selectedDate]: newList});
+                                            }} className="absolute -top-2 -right-2 bg-white shadow-md p-2 rounded-full text-rose-200 hover:text-rose-400"><Icon name="minus" size={16}/></button>
+                                            <input placeholder="哪家店？" value={drink.shop} onChange={e => {
+                                                const newList = records[selectedDate].map(i => i.id === drink.id ? {...i, shop: e.target.value} : i);
+                                                syncData({...records, [selectedDate]: newList});
+                                            }} className="w-1/2 bg-white/60 p-3 rounded-2xl text-sm font-bold border-none outline-none focus:ring-2 ring-pink-100" />
+                                            <input placeholder="喝什麼？" value={drink.item} onChange={e => {
+                                                const newList = records[selectedDate].map(i => i.id === drink.id ? {...i, item: e.target.value} : i);
+                                                syncData({...records, [selectedDate]: newList});
+                                            }} className="w-1/2 bg-white/60 p-3 rounded-2xl text-sm font-bold border-none outline-none focus:ring-2 ring-blue-100" />
+                                        </div>
+                                    ))}
+                                    <button onClick={() => {
+                                        const newList = [...(records[selectedDate] || []), { id: Date.now(), shop:'', item:'' }];
+                                        syncData({...records, [selectedDate]: newList});
+                                    }} className="w-full py-5 border-2 border-dashed border-pink-100 rounded-[2.2rem] text-pink-200 font-black text-sm hover:bg-pink-50 transition-all">+ 喝了新的一杯</button>
+                                </div>
+                                <button onClick={() => setIsModalOpen(false)} className="w-full bg-gradient-to-r from-[#FFD1DC] to-[#B5FFFC] text-white font-black py-5 rounded-[2.5rem] shadow-lg hover:scale-[1.02] active:scale-95 transition-all text-sm tracking-widest uppercase">完成記錄 ✨</button>
+                            </div>
+                        </div>
+                    )}
+                </div>
+            );
+        };
+
+        const root = ReactDOM.createRoot(document.getElementById('root'));
+        root.render(<App />);
+    </script>
 </body>
-
 </html>
